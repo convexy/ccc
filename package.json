@@ -5,7 +5,7 @@
   "main": "main.js",
   "type": "module",
   "scripts": {
-    "test": "npx vite"
+    "run": "node server.js"
   },
   "author": "convexy",
   "license": "ISC",
