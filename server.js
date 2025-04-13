@@ -115,7 +115,7 @@ function addCube() {
 }
 
 setTimeout(() => {
-  setInterval(addCube, 1000);
+  setInterval(addCube, 100);
 }, 1000);
 
 let lastTime = 0;
