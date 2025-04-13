@@ -118,8 +118,12 @@ setTimeout(() => {
   setInterval(addCube, 1000);
 }, 1000);
 
+let lastTime = 0;
 setInterval(() => {
-  cworld.physics.step(1 / 60);
+  let currentTime = performance.now() / 1000;
+  let deltaTime = currentTime - lastTime;
+  cworld.physics.step(1 / 60, deltaTime, 3);
+  lastTime = currentTime;
 }, 1000 / 60);
 
 setInterval(() => {
