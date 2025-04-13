@@ -1,17 +1,17 @@
 import * as CANNON from "cannon-es";
-import { WebSocket } from "ws";
+import { WebSocketServer } from "ws";
 import { v4 as uuidv4 } from "uuid";
 
 class CWorld extends CANNON.World {
   constructor() {
-    this.wss = new WebSocket.Server({ port: 8080 });
+    this.wss = new WebSocketServer({ port: 8080 });
     super({ gravity: new CANNON.Vec3(0, -9.82, 0) });
   }
   addBody(body) {
     super.addBody(body);
     this.wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({ type: "addBody", body: body }));
+        client.send(JSON.stringify({ type: "addBody", body: body, color: 0x00ffff }));
       }
     });
   }
@@ -19,7 +19,7 @@ class CWorld extends CANNON.World {
     super.removeBody(body);
     this.wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({ type: "removeBody", body: body }));
+        client.send(JSON.stringify({ type: "removeBody", id: body.id }));
       }
     });
   }
