@@ -3,7 +3,6 @@ import express from "express";
 import * as CANNON from "cannon-es";
 import { WebSocketServer, WebSocket } from "ws";
 import { v4 as uuidv4 } from "uuid";
-import { velocity } from "three/tsl";
 
 class CWorld {
   constructor() {
@@ -93,8 +92,8 @@ class CCube extends CObjects {
       mass: mass,
       shape: new CANNON.Box(new CANNON.Vec3(cubeSize / 2, cubeSize / 2, cubeSize / 2)),
       position: new CANNON.Vec3(0, 2, 0),
-      velocity: new CANNON.Vec3(velocity, 0, 0),
-      angularVelocity: new CANNON.Vec3(0, 0, -5),
+      velocity: new CANNON.Vec3(-velocity * Math.random(), velocity * Math.random(), -velocity * Math.random()),
+      angularVelocity: new CANNON.Vec3(0, 5, -100),
     });
     this.shapeType = "cube";
     this.cubeSize = cubeSize;
@@ -108,7 +107,7 @@ function addCube() {
   const ccube = new CCube();
   cworld.addCObject(ccube);
   ccubes.push(ccube);
-  if (ccubes.length > 300) {
+  if (ccubes.length > 50) {
     const oldCube = ccubes.shift();
     cworld.removeCObject(oldCube);
   }

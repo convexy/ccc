@@ -175,8 +175,9 @@ ws.onmessage = (event) => {
         scene.add(mesh);
         world.addBody(body);
         break;
-      case "removeCobject":
+      case "removeCObject":
         const removeCObject = cobjects[data.id];
+        console.log("remove", removeCObject);
         if (removeCObject) {
           scene.remove(removeCObject.mesh);
           world.removeBody(removeCObject.body);
@@ -197,7 +198,6 @@ function animate() {
   world.step(1 / 60, deltaTime, 3);
 
   if (poses) {
-    console.log("accept and update poses");
     for (const id in poses) {
       if (!cobjects[id]) continue;
       const cobject = cobjects[id];
