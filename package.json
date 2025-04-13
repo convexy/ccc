@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "main.js",
+  "type": "module",
   "scripts": {
-    "test": "npx vite"
+    "run": "node server.js"
   },
   "author": "convexy",
   "license": "ISC",

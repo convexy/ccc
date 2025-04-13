@@ -1,84 +1,138 @@
+import { createServer } from "http";
+import express from "express";
 import * as CANNON from "cannon-es";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import { v4 as uuidv4 } from "uuid";
+import { velocity } from "three/tsl";
 
-class CWorld extends CANNON.World {
+class CWorld {
   constructor() {
+    this.physics = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
     this.wss = new WebSocketServer({ port: 8080 });
-    super({ gravity: new CANNON.Vec3(0, -9.82, 0) });
+    this.cobjects = [];
   }
-  addBody(body) {
-    super.addBody(body);
+  addCObject(cobject) {
+    this.cobjects.push(cobject);
+    this.physics.addBody(cobject.physics);
     this.wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({ type: "addBody", body: body, color: 0x00ffff }));
+        client.send(JSON.stringify({
+          type: "addCObject", body: cobject.getBase()
+        }));
       }
     });
   }
-  removeBody(body) {
-    super.removeBody(body);
+  removeCObject(cobject) {
+    this.cobjects.splice(this.cobjects.indexOf(cobject), 1);
+    this.physics.removeBody(cobject);
     this.wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({ type: "removeBody", id: body.id }));
+        client.send(JSON.stringify({ type: "removeCObject", id: cobject.id }));
       }
+    });
+  }
+  sendAllCobjects(ws) {
+    this.cobjects.forEach((cobject) => {
+      ws.send(JSON.stringify({
+        type: "addCObject", body: cobject.getBase()
+      }));
     });
   }
   getPoses() {
-    return this.bodies.reduce((poses, body) => {
-      poses[body.id] = {
-        position: body.position,
-        quaternion: body.quaternion,
+    return this.cobjects.reduce((poses, cobject) => {
+      poses[cobject.id] = {
+        position: cobject.physics.position,
+        quaternion: cobject.physics.quaternion,
+        velocity: cobject.physics.velocity,
+        angularVelocity: cobject.physics.angularVelocity,
       };
+      return poses;
     }, {});
-  }
-}
-
-class CBody extends CANNON.Body {
-  constructor(options) {
-    this.id = uuidv4();
-    super(options);
   }
 }
 
 const cworld = new CWorld();
 
-const groundBody = new CBody({
+cworld.wss.on("connection", (ws) => {
+  cworld.sendAllCobjects(ws);
+});
+
+const groundBody = new CANNON.Body({
   type: CANNON.Body.STATIC,
   shape: new CANNON.Plane(),
 });
 groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
-cworld.addBody(groundBody);
+cworld.physics.addBody(groundBody);
 
-const cubeBodies = [];
+class CObjects {
+  constructor() {
+  }
+  getBase() {
+    return {
+      id: this.id,
+      mass: this.mass,
+      shapeType: this.shapeType,
+      cubesize: this.cubeSize,
+      color: this.color,
+      position: this.physics.position,
+      quaternion: this.physics.quaternion,
+      velocity: this.physics.velocity,
+      angularVelocity: this.physics.angularVelocity,
+    }
+  }
+}
+
+class CCube extends CObjects {
+  constructor() {
+    super();
+    this.id = uuidv4();
+    const cubeSize = 0.4;
+    const mass = 1;
+    const velocity = 10;
+    this.physics = new CANNON.Body({
+      mass: mass,
+      shape: new CANNON.Box(new CANNON.Vec3(cubeSize / 2, cubeSize / 2, cubeSize / 2)),
+      position: new CANNON.Vec3(0, 2, 0),
+      velocity: new CANNON.Vec3(velocity, 0, 0),
+      angularVelocity: new CANNON.Vec3(0, 0, -5),
+    });
+    this.shapeType = "cube";
+    this.cubeSize = cubeSize;
+    this.mass = mass;
+    this.color = 0x00ffff;
+  }
+}
+
+const ccubes = [];
 function addCube() {
-  const cubeSize = 0.4;
-  const velocity = 10;
-  const cubeBody = new Cbody({
-    mass: 1,
-    shape: new CANNON.Box(new CANNON.Vec3(cubeSize / 2, cubeSize / 2, cubeSize / 2)),
-    position: new CANNON.Vec3(0, 1, 0),
-    velocity: new CANNON.Vec3(velocity, 0, 0),
-    angularVelocity: new CANNON.Vec3(0, 0, -5),
-  });
-  cubeBodies.push(cubeBody.cubeBody);
-  if (cubeBodies.length > 300) {
-    const oldCubeBody = cubeBodies.shift();
-    world.removeBody(oldCubeBody.body);
+  const ccube = new CCube();
+  cworld.addCObject(ccube);
+  ccubes.push(ccube);
+  if (ccubes.length > 300) {
+    const oldCube = ccubes.shift();
+    cworld.removeCObject(oldCube);
   }
 }
 
 setTimeout(() => {
   setInterval(addCube, 1000);
-}, 10000);
+}, 1000);
 
 setInterval(() => {
-  cworld.step(1 / 60);
+  cworld.physics.step(1 / 60);
 }, 1000 / 60);
 
 setInterval(() => {
   cworld.wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ type: "update", data: cworld.getPoses() }));
+      client.send(JSON.stringify({ type: "updatePoses", poses: cworld.getPoses() }));
     }
   });
-}, 500);
+}, 1000);
+
+const app = express();
+const server = createServer(app);
+app.use(express.static("public"));
+server.listen(8000, () => {
+  console.log("Server is running on http://localhost:8000");
+});

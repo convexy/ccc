@@ -1,8 +1,5 @@
-import * as THREE from "three";
-import * as CANNON from "cannon-es";
-import { WebSocket } from "ws";
-
-import Stats from "stats.js";
+import * as THREE from "./libs/three/three.module.js";
+import * as CANNON from "./libs/cannon-es/cannon-es.js";
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -39,9 +36,21 @@ const world = new CANNON.World({
   gravity: new CANNON.Vec3(0, -9.82, 0),
 });
 
-const stats = new Stats();
-stats.showPanel(0);
-document.body.appendChild(stats.dom);
+(function () {
+  const groundBody = new CANNON.Body({
+    type: CANNON.Body.STATIC,
+    shape: new CANNON.Plane(),
+  });
+  groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+  world.addBody(groundBody);
+  const goundGeometry = new THREE.PlaneGeometry(100, 100);
+  const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x888888 });
+  const groundMesh = new THREE.Mesh(goundGeometry, groundMaterial);
+  groundMesh.rotation.x = -Math.PI / 2;
+  groundMesh.receiveShadow = true;
+  scene.add(groundMesh);
+})();
+
 
 const keys = {
   w: false,
@@ -119,7 +128,8 @@ window.addEventListener("keyup", (event) => {
 });
 
 class CObjects {
-  constructor(body, mesh) {
+  constructor(id, body, mesh) {
+    this.id = id;
     this.body = body;
     this.mesh = mesh;
   }
@@ -140,25 +150,32 @@ function moveCamera(deltaTime) {
 
 let poses = null;
 let cobjects = {};
-const ws = new WebSocket("ws://localhost:8080");
+const ws = new WebSocket("ws://" + location.hostname + ":8080");
 ws.onmessage = (event) => {
-  data = JSON.parse(event.data);
+  const data = JSON.parse(event.data);
   if (data.type) {
     switch (data.type) {
-      case "addBody":
-        const body = new CANNON.Body(data.body);
-        const geometry = new THREE.BoxGeometry(data.body.shapes[0].halfExtents.x * 2, data.body.shapes[0].halfExtents.y * 2, data.body.shapes[0].halfExtents.z * 2);
-        const material = new THREE.MeshPhongMaterial({ color: data.color });
+      case "addCObject":
+        const body = new CANNON.Body({
+          mass: data.body.mass,
+          shape: new CANNON.Box(new CANNON.Vec3(data.body.cubesize / 2, data.body.cubesize / 2, data.body.cubesize / 2)),
+          position: data.body.position,
+          quaternion: data.body.quaternion,
+          velocity: data.body.velocity,
+          angularVelocity: data.body.angularVelocity,
+        });
+        const geometry = new THREE.BoxGeometry(data.body.cubesize, data.body.cubesize, data.body.cubesize);
+        const material = new THREE.MeshPhongMaterial({ color: data.body.color });
         const mesh = new THREE.Mesh(geometry, material);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.position.copy(body.position);
         mesh.quaternion.copy(body.quaternion);
-        cobjects[data.body.id] = new CObjects(body, mesh);
+        cobjects[data.body.id] = new CObjects(data.body.id, body, mesh);
         scene.add(mesh);
         world.addBody(body);
         break;
-      case "removeBody":
+      case "removeCobject":
         const removeCObject = cobjects[data.id];
         if (removeCObject) {
           scene.remove(removeCObject.mesh);
@@ -176,26 +193,32 @@ ws.onmessage = (event) => {
 
 const clock = new THREE.Clock();
 function animate() {
-  stats.begin();
   const deltaTime = clock.getDelta();
   world.step(1 / 60, deltaTime, 3);
 
   if (poses) {
+    console.log("accept and update poses");
     for (const id in poses) {
+      if (!cobjects[id]) continue;
+      const cobject = cobjects[id];
       const pose = poses[id];
-      if (cobjects[id]) {
-        cobjects[id].body.position.lerp(pose.position, 0.2);
-        cobjects[id].body.quaternion.lerp(pose.quaternion, 0.2);
-      }
+      cobject.body.position.copy(pose.position);
+      cobject.body.quaternion.copy(pose.quaternion);
+      cobject.body.velocity.copy(pose.velocity);
+      cobject.body.angularVelocity.copy(pose.angularVelocity);
+      // cobject.body.position.lerp(new CANNON.Vec3(pose.position.x, pose.position.y, pose.position.z), 0.2, cobject.body.position);
+      // cobject.body.quaternion.slerp(new CANNON.Quaternion(pose.quaternion.x, pose.quaternion.y, pose.quaternion.z, pose.quaternion.w), 0.2, cobject.body.quaternion);
+      // cobject.body.velocity.lerp(new CANNON.Vec3(pose.velocity.x, pose.velocity.y, pose.velocity.z), 0.2, cobject.body.velocity);
+      // cobject.body.angularVelocity.lerp(new CANNON.Vec3(pose.angularVelocity.x, pose.angularVelocity.y, pose.angularVelocity.z), 0.2, cobject.body.angularVelocity);
     }
+    poses = null;
   }
-  for (const cobject of cobjects) {
+  for (const cobject of Object.values(cobjects)) {
     cobject.mesh.position.copy(cobject.body.position);
     cobject.mesh.quaternion.copy(cobject.body.quaternion);
   }
   moveCamera(deltaTime);
   renderer.render(scene, camera);
-  stats.end();
 }
 renderer.setAnimationLoop(animate);
 
