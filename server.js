@@ -11,7 +11,7 @@ class CWorld extends CANNON.World {
     super.addBody(body);
     this.wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({ type: "addBody", body }));
+        client.send(JSON.stringify({ type: "addBody", body: body }));
       }
     });
   }
@@ -19,9 +19,17 @@ class CWorld extends CANNON.World {
     super.removeBody(body);
     this.wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({ type: "removeBody", body }));
+        client.send(JSON.stringify({ type: "removeBody", body: body }));
       }
     });
+  }
+  getPoses() {
+    return this.bodies.reduce((poses, body) => {
+      poses[body.id] = {
+        position: body.position,
+        quaternion: body.quaternion,
+      };
+    }, {});
   }
 }
 
@@ -67,12 +75,10 @@ setInterval(() => {
   cworld.step(1 / 60);
 }, 1000 / 60);
 
-cworld.wss.on("connection", (ws) => {
-  console.log("Client connected");
-  ws.on("message", (message) => {
-    console.log(`Received: ${message}`);
+setInterval(() => {
+  cworld.wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify({ type: "update", data: cworld.getPoses() }));
+    }
   });
-  ws.on("close", () => {
-    console.log("Client disconnected");
-  });
-});
+}, 500);
