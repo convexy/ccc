@@ -107,7 +107,7 @@ function addCube() {
   const ccube = new CCube();
   cworld.addCObject(ccube);
   ccubes.push(ccube);
-  if (ccubes.length > 50) {
+  if (ccubes.length > 300) {
     const oldCube = ccubes.shift();
     cworld.removeCObject(oldCube);
   }
