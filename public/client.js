@@ -1,5 +1,6 @@
 import * as THREE from "./libs/three/three.module.js";
 import * as CANNON from "./libs/cannon-es/cannon-es.js";
+import GLTFLoader from "./libs/three/GLTFLoader.js";
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -50,6 +51,11 @@ const world = new CANNON.World({
   groundMesh.receiveShadow = true;
   scene.add(groundMesh);
 })();
+
+const loader = new GLTFLoader();
+loader.load("/assets/models/book.glb", (gltf) => {
+  scene.add(gltf.scene);
+});
 
 
 const keys = {
